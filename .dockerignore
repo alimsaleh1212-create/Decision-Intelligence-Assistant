@@ -1,0 +1,43 @@
+# Never copy secrets into images
+.env
+*.env
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data and models (mounted via volumes or copied separately)
+data/
+models/
+logs/
+
+# Notebooks (not needed in production images)
+notebooks/
+
+# Node (each frontend build stage handles its own install)
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Git
+.git/
+.gitignore
+
+# Docs / planning
+*.md
+plan.md
+resources/
+
+# IDE
+.vscode/
+.idea/

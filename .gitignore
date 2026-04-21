@@ -1,0 +1,64 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# uv
+uv.lock
+
+# Environment secrets
+.env
+*.env
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ML artefacts
+models/*.joblib
+models/*.pkl
+models/*.pickle
+
+# Data (raw is read-only and large; processed is generated)
+data/raw/
+data/processed/
+
+# Logs
+logs/*.jsonl
+logs/*.log
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# mypy
+.mypy_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/

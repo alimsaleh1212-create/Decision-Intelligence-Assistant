@@ -1,0 +1,130 @@
+networks:
+  dia-net:
+    driver: bridge
+
+volumes:
+  ollama_data:
+    external: true   # pre-created: docker volume create ollama_data
+  qdrant_data:
+    external: false  # created by Compose on first run
+  logs_data:
+    external: false
+
+services:
+
+  # ── Ollama ───────────────────────────────────────────────────────────────
+  # Serves gemma4:31b-cloud (LLM) and nomic-embed-text (embeddings).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/root/.ollama/models
+      - OLLAMA_KEEP_ALIVE=5m
+    networks:
+      - dia-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── Ollama model pull (runs once, exits) ─────────────────────────────────
+  # Pulls nomic-embed-text on first startup. The LLM model (gemma4:31b-cloud)
+  # is already available via the external ollama_data volume.
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama pull nomic-embed-text
+        echo "ollama-init complete"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    networks:
+      - dia-net
+
+  # ── Qdrant ───────────────────────────────────────────────────────────────
+  # Vector store for embedded support tickets.
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    ports:
+      - "6333:6333"   # HTTP / REST + Web UI
+      - "6334:6334"   # gRPC (high-throughput)
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__LOG_LEVEL=INFO
+    networks:
+      - dia-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Backend ──────────────────────────────────────────────────────────────
+  # FastAPI service — RAG, LLM, ML endpoints.
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dia-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models:ro       # trained model artefacts (read-only)
+      - logs_data:/app/logs           # persistent query logs
+    env_file:
+      - .env
+    environment:
+      # Override defaults so services talk by Docker service name, not localhost
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - LOG_DIR=/app/logs
+    depends_on:
+      ollama:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - dia-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend ─────────────────────────────────────────────────────────────
+  # React SPA served by nginx. Talks to backend via the Docker network.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # At build time, point the SPA at the publicly reachable backend URL.
+        # Change this to your deployed backend URL in production.
+        VITE_API_BASE_URL: http://localhost:8000
+    container_name: dia-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - dia-net
