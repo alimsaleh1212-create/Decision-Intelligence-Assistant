@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.settings import get_settings
-from app.routers import health, priority, query
+from app.routers import health, ingest, priority, query
 
 _LOG_CONFIG = {
     "version": 1,
@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(query.router)
     app.include_router(priority.router)
+    app.include_router(ingest.router)
 
     return app
 
