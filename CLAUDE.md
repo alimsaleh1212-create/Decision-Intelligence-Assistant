@@ -253,7 +253,6 @@ uv sync --no-dev               # Install production deps only
 uv run python ...              # Run Python inside the venv
 uv run pytest                  # Run tests inside the venv
 uv run uvicorn app.main:app    # Start FastAPI
-uv run streamlit run app/ui.py # Start Streamlit UI
 uv add <package>               # Add a new production dependency
 uv add --dev <package>         # Add a new dev dependency
 ```

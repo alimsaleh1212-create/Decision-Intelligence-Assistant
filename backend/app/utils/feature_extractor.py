@@ -8,7 +8,11 @@ import logging
 import re
 import string
 
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
 logger = logging.getLogger(__name__)
+
+_VADER = SentimentIntensityAnalyzer()  # loaded once per process
 
 _URGENCY_KEYWORDS = frozenset(
     ["refund", "broken", "cancel", "outage", "down", "not working",
@@ -67,6 +71,8 @@ def extract_features(text: str) -> dict[str, float]:
     - urgency_keyword_count: Direct urgency signal from domain vocabulary.
     - flesch_reading_ease: Simpler text (higher score) is often a quick complaint.
     - avg_word_length: Longer words may indicate technical or formal complaints.
+    - vader_sentiment: VADER compound score (-1 to +1). Negative sentiment correlates
+      with frustration and urgency; VADER handles emojis and slang natively.
 
     Args:
         text: Raw ticket text. Must not be empty.
@@ -102,6 +108,7 @@ def extract_features(text: str) -> dict[str, float]:
         "urgency_keyword_count": float(urgency_hits),
         "flesch_reading_ease": reading_ease,
         "avg_word_length": avg_word_len,
+        "vader_sentiment": float(_VADER.polarity_scores(text)["compound"]),
     }
 
     logger.debug("Features extracted", extra={"features": features})

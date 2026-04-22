@@ -16,6 +16,7 @@ dependencies = [
     "pandas==2.2.3",
     "numpy==2.2.5",
     "python-dotenv==1.1.0",
+    "vaderSentiment==3.3.2",
 ]
 
 [dependency-groups]
@@ -29,6 +30,13 @@ dev = [
     "flake8==7.1.1",
     "mypy==1.13.0",
     "types-requests==2.32.0.20241016",
+    # Notebook / EDA tools — never imported by the FastAPI application
+    "matplotlib==3.10.1",
+    "seaborn==0.13.2",
+    "kaggle==1.7.4",
+    "ipykernel==6.29.5",
+    "notebook==7.4.2",
+    "tqdm==4.67.1",
 ]
 
 [tool.black]

@@ -14,6 +14,7 @@ def test_extract_features_returns_all_keys():
     expected_keys = {
         "char_count", "word_count", "exclamation_count", "question_count",
         "caps_ratio", "urgency_keyword_count", "flesch_reading_ease", "avg_word_length",
+        "vader_sentiment",
     }
     assert set(features.keys()) == expected_keys
 
@@ -53,3 +54,15 @@ def test_extract_features_all_floats():
     """All feature values are floats."""
     features = extract_features("My order is broken and I need help")
     assert all(isinstance(v, float) for v in features.values())
+
+
+def test_extract_features_vader_sentiment_negative():
+    """Frustrated/angry text produces a negative VADER compound score."""
+    features = extract_features("This is absolutely terrible! I am furious and disgusted!")
+    assert features["vader_sentiment"] < 0.0
+
+
+def test_extract_features_vader_sentiment_positive():
+    """Satisfied/happy text produces a positive VADER compound score."""
+    features = extract_features("Thank you so much, everything is working great now!")
+    assert features["vader_sentiment"] > 0.0
