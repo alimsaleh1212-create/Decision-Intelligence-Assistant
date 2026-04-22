@@ -1,64 +1,50 @@
-# Virtual environments
-.venv/
-venv/
-env/
-
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
-*.pyd
-*.so
-*.egg
+.venv/
+venv/
+env/
 *.egg-info/
 dist/
 build/
-.eggs/
 
 # uv
-uv.lock
+.uv/
 
-# Environment secrets
+# Environment
 .env
-*.env
+*.env.local
 
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# ML artefacts
-models/*.joblib
-models/*.pkl
-models/*.pickle
-
-# Data (raw is read-only and large; processed is generated)
+# Data — raw is large, processed is generated
 data/raw/
 data/processed/
 
+# Models — generated artifacts, not source
+models/*.joblib
+
 # Logs
-logs/*.jsonl
-logs/*.log
-
-# Test / coverage
-.pytest_cache/
-.coverage
-coverage.xml
-htmlcov/
-
-# mypy
-.mypy_cache/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
+logs/
+*.log
+*.jsonl
 
 # Node
 node_modules/
 frontend/dist/
-frontend/.vite/
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Resources — course PDFs and archives
+resources/

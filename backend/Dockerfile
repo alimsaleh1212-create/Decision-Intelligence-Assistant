@@ -9,10 +9,10 @@ WORKDIR /build
 
 # Copy dependency manifests first so Docker caches the install layer
 # separately from application code.
-COPY pyproject.toml .
+COPY pyproject.toml uv.lock ./
 
 # Sync production deps only (no dev tools in the final image)
-RUN uv sync --no-dev --no-cache
+RUN uv sync --no-dev --frozen --no-cache
 
 # Stage 2: runtime image
 FROM python:3.13-slim AS runtime
@@ -43,4 +43,4 @@ USER appuser
 EXPOSE 8000
 
 # Use uvicorn directly — no shell wrapper needed
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/.venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

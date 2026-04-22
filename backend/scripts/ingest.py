@@ -5,8 +5,14 @@ and upserts all points into the Qdrant collection.
 
 Run once after the stack is up:
     docker compose exec backend python scripts/ingest.py
+    docker compose exec backend python scripts/ingest.py --limit 50000
+
+The --limit flag caps how many tickets are embedded (default: 50 000).
+Embedding 775K rows one-by-one would take many hours; 50K gives strong
+retrieval coverage in a manageable time.
 """
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -26,10 +32,23 @@ logger = logging.getLogger(__name__)
 
 _PROCESSED_PATH = Path(__file__).parent.parent.parent / "data" / "processed" / "tickets.csv"
 _BATCH_SIZE = 50
+_DEFAULT_LIMIT = 50_000
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Ingest tickets into Qdrant.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=_DEFAULT_LIMIT,
+        help=f"Max tickets to embed (default: {_DEFAULT_LIMIT:,}). Pass 0 for all rows.",
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
-    """Embed and upsert all processed tickets into Qdrant."""
+    """Embed and upsert processed tickets into Qdrant."""
+    args = _parse_args()
     settings = get_settings()
 
     if not _PROCESSED_PATH.exists():
@@ -43,6 +62,13 @@ def main() -> None:
 
     texts = df["text"].dropna().tolist()
     logger.info("Loaded %d tickets from %s", len(texts), _PROCESSED_PATH)
+
+    if args.limit > 0 and len(texts) > args.limit:
+        # Deterministic sample so re-runs are consistent
+        import random
+        random.seed(42)
+        texts = random.sample(texts, args.limit)
+        logger.info("Sampled %d tickets (--limit %d)", len(texts), args.limit)
 
     qdrant = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
     ollama_client = ollama.Client(host=settings.ollama_base_url)

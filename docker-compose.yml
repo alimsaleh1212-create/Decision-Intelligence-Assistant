@@ -29,30 +29,11 @@ services:
     networks:
       - dia-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  # ── Ollama model pull (runs once, exits) ─────────────────────────────────
-  # Pulls nomic-embed-text on first startup. The LLM model (gemma4:31b-cloud)
-  # is already available via the external ollama_data volume.
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: ollama-init
-    restart: "no"
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        ollama pull nomic-embed-text
-        echo "ollama-init complete"
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-    networks:
-      - dia-net
+      test: ["CMD-SHELL", "bash -c 'cat </dev/null >/dev/tcp/localhost/11434'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # ── Qdrant ───────────────────────────────────────────────────────────────
   # Vector store for embedded support tickets.
@@ -70,10 +51,11 @@ services:
     networks:
       - dia-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "bash -c 'cat </dev/null >/dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # ── Backend ──────────────────────────────────────────────────────────────
   # FastAPI service — RAG, LLM, ML endpoints.
@@ -104,10 +86,11 @@ services:
     networks:
       - dia-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "bash -c 'cat </dev/null >/dev/tcp/localhost/8000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   # ── Frontend ─────────────────────────────────────────────────────────────
   # React SPA served by nginx. Talks to backend via the Docker network.
