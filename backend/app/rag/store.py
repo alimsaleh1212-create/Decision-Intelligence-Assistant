@@ -63,6 +63,16 @@ def upsert_chunks(
             f"Chunk count ({len(chunks)}) does not match vector count ({len(vectors)})"
         )
 
+    # Drop any chunks whose embedding failed (empty vector placeholder from embedder)
+    pairs = [(c, v) for c, v in zip(chunks, vectors) if v]
+    skipped = len(chunks) - len(pairs)
+    if skipped:
+        logger.warning("Skipping %d chunks with empty embedding vectors", skipped)
+    if not pairs:
+        logger.warning("No valid vectors to upsert in this batch")
+        return 0
+
+    chunks, vectors = zip(*pairs)  # type: ignore[assignment]
     total = len(chunks)
     for start in range(0, total, batch_size):
         batch_chunks = chunks[start : start + batch_size]
