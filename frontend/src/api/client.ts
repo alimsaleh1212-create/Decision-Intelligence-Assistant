@@ -39,8 +39,12 @@ export const api = {
   brands: (): Promise<BrandsResponse> =>
     get<BrandsResponse>("/api/brands"),
 
-  query: (query: string, brand?: string): Promise<QueryResponse> =>
-    post<QueryResponse>("/api/query", { query, brand: brand || null }),
+  query: (query: string, brand?: string, ragScoreThreshold?: number): Promise<QueryResponse> =>
+    post<QueryResponse>("/api/query", {
+      query,
+      brand: brand || null,
+      rag_score_threshold: ragScoreThreshold ?? null,
+    }),
 
   priorityML: (text: string): Promise<PriorityResponse> =>
     post<PriorityResponse>("/api/priority/ml", { text }),

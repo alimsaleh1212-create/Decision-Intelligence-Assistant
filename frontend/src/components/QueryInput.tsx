@@ -1,21 +1,23 @@
 import { type KeyboardEvent, useState } from "react";
 
 interface Props {
-  onSubmit: (query: string, brand?: string) => void;
+  onSubmit: (query: string, brand?: string, threshold?: number) => void;
   isLoading: boolean;
   brands: string[];
 }
 
 const MAX_LEN = 2000;
+const DEFAULT_THRESHOLD = 0.6;
 
 export function QueryInput({ onSubmit, isLoading, brands }: Props) {
   const [text, setText] = useState("");
   const [brand, setBrand] = useState("");
+  const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canSubmit) {
       e.preventDefault();
-      onSubmit(text.trim(), brand || undefined);
+      onSubmit(text.trim(), brand || undefined, threshold);
     }
   };
 
@@ -55,6 +57,22 @@ export function QueryInput({ onSubmit, isLoading, brands }: Props) {
         )}
       </div>
 
+      {/* RAG score threshold row */}
+      <div className="query-threshold-row">
+        <span className="query-brand-label">RAG Threshold</span>
+        <input
+          className="threshold-slider"
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={threshold}
+          onChange={(e) => setThreshold(parseFloat(e.target.value))}
+          disabled={isLoading}
+        />
+        <span className="threshold-value">{threshold.toFixed(2)}</span>
+      </div>
+
       <textarea
         className="query-textarea"
         placeholder="Describe the support issue or paste a ticket…"
@@ -71,7 +89,7 @@ export function QueryInput({ onSubmit, isLoading, brands }: Props) {
         </span>
         <button
           className="btn-submit"
-          onClick={() => onSubmit(text.trim(), brand || undefined)}
+          onClick={() => onSubmit(text.trim(), brand || undefined, threshold)}
           disabled={!canSubmit}
         >
           {isLoading && <span className="spinner" />}

@@ -36,8 +36,6 @@ async def log_query(
     """
     settings = get_settings()
     log_dir = Path(settings.log_dir)
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "queries.jsonl"
 
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -52,6 +50,8 @@ async def log_query(
     }
 
     try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "queries.jsonl"
         with open(log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:

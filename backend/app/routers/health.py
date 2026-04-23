@@ -1,6 +1,7 @@
 """Health check endpoint.
 
-Returns the reachability status of Ollama, Qdrant, and Gemini fallback.
+Returns the reachability status of Gemini (primary LLM), Ollama (fallback + embeddings),
+and Qdrant.
 """
 
 import logging
@@ -31,7 +32,7 @@ class HealthResponse(BaseModel):
     status: str
     ollama: ServiceStatus
     qdrant: ServiceStatus
-    gemini_fallback_configured: bool
+    gemini_configured: bool
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -43,18 +44,19 @@ async def health_check() -> HealthResponse:
     """
     settings = get_settings()
 
-    # Check Ollama
     ollama_status = await _check_ollama(settings.ollama_base_url)
-
-    # Check Qdrant
     qdrant_status = _check_qdrant(settings.qdrant_host, settings.qdrant_port)
 
-    overall = "ok" if ollama_status.reachable and qdrant_status.reachable else "degraded"
+    # Overall ok when Qdrant is reachable AND at least one LLM is available.
+    # Gemini configured = primary LLM ready; Ollama reachable = fallback ready.
+    llm_available = settings.gemini_configured or ollama_status.reachable
+    overall = "ok" if (qdrant_status.reachable and llm_available) else "degraded"
 
     logger.info(
         "Health check",
         extra={
             "status": overall,
+            "gemini_configured": settings.gemini_configured,
             "ollama": ollama_status.reachable,
             "qdrant": qdrant_status.reachable,
         },
@@ -64,7 +66,7 @@ async def health_check() -> HealthResponse:
         status=overall,
         ollama=ollama_status,
         qdrant=qdrant_status,
-        gemini_fallback_configured=settings.gemini_fallback_enabled,
+        gemini_configured=settings.gemini_configured,
     )
 
 

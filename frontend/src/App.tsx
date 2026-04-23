@@ -35,14 +35,14 @@ export default function App() {
     api.brands().then((r) => setBrands(r.brands)).catch(() => setBrands([]));
   }, []);
 
-  const handleQuery = useCallback(async (query: string, brand?: string) => {
+  const handleQuery = useCallback(async (query: string, brand?: string, threshold?: number) => {
     if (!query) return;
 
     setState((s) => ({ ...s, isLoading: true, error: null }));
 
     try {
       const [queryRes, mlRes, llmRes] = await Promise.all([
-        api.query(query, brand),
+        api.query(query, brand, threshold),
         api.priorityML(query),
         api.priorityLLM(query),
       ]);
@@ -77,7 +77,7 @@ export default function App() {
         <div className="status-dots">
           <StatusDot label="OLLAMA" reachable={health?.ollama.reachable ?? null} />
           <StatusDot label="QDRANT" reachable={health?.qdrant.reachable ?? null} />
-          {health?.gemini_fallback_configured && (
+          {health?.gemini_configured && (
             <StatusDot label="GEMINI" reachable={true} />
           )}
         </div>

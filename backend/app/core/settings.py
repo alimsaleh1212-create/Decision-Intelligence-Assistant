@@ -23,21 +23,21 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Ollama — primary LLM + embeddings
+    # Gemini — primary LLM
+    google_api_key: str | None = None
+    gemini_llm_model: str = "gemini-2.5-flash"
+
+    # Ollama — fallback LLM + embeddings (embeddings always via Ollama)
     ollama_base_url: str = "http://ollama:11434"
     ollama_llm_model: str = "gemma4:31b-cloud"
     ollama_embed_model: str = "nomic-embed-text"
     ollama_timeout_seconds: int = 30
 
-    # Gemini — optional fallback LLM
-    google_api_key: str | None = None
-    gemini_llm_model: str = "gemini-2.5-flash"
-
     # Qdrant
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
     qdrant_collection: str = "support_tickets"
-    qdrant_top_k: int = 5
+    qdrant_top_k: int = 3
 
     # Backend
     log_level: str = "INFO"
@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # Chunks whose best match score falls below this value are considered
     # too dissimilar to be useful; the LLM call is skipped entirely.
     # Override with RAG_SCORE_THRESHOLD env var.
-    rag_score_threshold: float = 0.5
+    rag_score_threshold: float = 0.6
 
     @field_validator("ollama_base_url")
     @classmethod
@@ -67,7 +67,7 @@ class Settings(BaseSettings):
         return v
 
     @property
-    def gemini_fallback_enabled(self) -> bool:
+    def gemini_configured(self) -> bool:
         """True when GOOGLE_API_KEY is set and non-empty."""
         return bool(self.google_api_key)
 
@@ -87,9 +87,10 @@ def get_settings() -> Settings:
     logger.info(
         "Settings loaded",
         extra={
+            "gemini_model": settings.gemini_llm_model,
+            "gemini_configured": settings.gemini_configured,
             "ollama_model": settings.ollama_llm_model,
             "embed_model": settings.ollama_embed_model,
-            "gemini_fallback": settings.gemini_fallback_enabled,
             "qdrant_host": settings.qdrant_host,
         },
     )

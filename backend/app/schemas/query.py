@@ -16,6 +16,7 @@ class QueryRequest(BaseModel):
 
     query: str = Field(min_length=1, max_length=2000)
     brand: str | None = None
+    rag_score_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class QueryResponse(BaseModel):

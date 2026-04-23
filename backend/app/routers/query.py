@@ -41,7 +41,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     try:
         tickets = await retriever.retrieve(request.query, brand=request.brand)
         rag_answer, non_rag_answer = await generator.generate_both(
-            request.query, tickets
+            request.query, tickets, score_threshold=request.rag_score_threshold
         )
     except Exception as exc:
         logger.error("Query pipeline failed: %s", exc)

@@ -25,7 +25,7 @@ export interface HealthResponse {
   status: string;
   ollama: { reachable: boolean; detail: string };
   qdrant: { reachable: boolean; detail: string };
-  gemini_fallback_configured: boolean;
+  gemini_configured: boolean;
 }
 
 export interface BrandsResponse {

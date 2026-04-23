@@ -1,7 +1,7 @@
-"""LLM client abstraction — Ollama primary, Gemini fallback.
+"""LLM client abstraction — Gemini primary, Ollama fallback.
 
 All LLM generation goes through generate(). No other module calls
-Ollama or Gemini directly. The caller never knows which provider responded.
+Gemini or Ollama directly. The caller never knows which provider responded.
 """
 
 import logging
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMError(Exception):
-    """Raised when both Ollama and Gemini (if configured) fail."""
+    """Raised when both Gemini and Ollama fail."""
 
 
 @dataclass
@@ -32,10 +32,7 @@ class LLMResult:
 
 @lru_cache(maxsize=1)
 def _get_ollama_client() -> ollama.Client:
-    """Return a single cached Ollama client for the process lifetime.
-
-    Settings are also cached via lru_cache, so host/timeout are stable.
-    """
+    """Return a single cached Ollama client for the process lifetime."""
     settings = get_settings()
     return ollama.Client(
         host=settings.ollama_base_url,
@@ -57,7 +54,7 @@ def _get_gemini_model(system: str) -> "genai.GenerativeModel":  # type: ignore[n
     Returns:
         Configured GenerativeModel instance, cached for the process lifetime.
     """
-    import google.generativeai as genai  # lazy import — only when fallback fires
+    import google.generativeai as genai  # lazy import — only when Gemini is used
 
     settings = get_settings()
     genai.configure(api_key=settings.google_api_key)
@@ -67,15 +64,16 @@ def _get_gemini_model(system: str) -> "genai.GenerativeModel":  # type: ignore[n
     )
 
 
-def generate(prompt: str, system: str = "") -> LLMResult:
-    """Generate text from the configured LLM with automatic fallback.
+def generate(prompt: str, system: str = "", max_tokens: int | None = None) -> LLMResult:
+    """Generate text — Gemini primary, Ollama fallback.
 
-    Tries Ollama first. On any failure falls back to Gemini 2.5 Flash
-    if GOOGLE_API_KEY is configured. If neither succeeds, raises LLMError.
+    Tries Gemini first if GOOGLE_API_KEY is configured. On any Gemini failure
+    (or if no API key) falls back to Ollama. If neither succeeds, raises LLMError.
 
     Args:
         prompt: The user/task prompt (caller is responsible for sanitizing).
         system: Optional system instruction prepended to the conversation.
+        max_tokens: Hard cap on output tokens. None = model default.
 
     Returns:
         LLMResult with generated text, provider name, latency, and cost.
@@ -83,27 +81,67 @@ def generate(prompt: str, system: str = "") -> LLMResult:
     Raises:
         LLMError: When all configured providers fail.
     """
+    settings = get_settings()
+
+    if settings.gemini_configured:
+        try:
+            return _call_gemini(prompt, system, max_tokens)
+        except LLMError as exc:
+            logger.warning(
+                "Gemini primary failed, falling back to Ollama: %s",
+                exc,
+                extra={"provider": "gemini"},
+            )
+
+    # Ollama: primary when Gemini not configured, fallback otherwise.
     try:
-        return _call_ollama(prompt, system)
-    except (ollama.ResponseError, ConnectionError, TimeoutError, Exception) as exc:
-        settings = get_settings()
-        logger.warning(
-            "Ollama call failed, checking fallback: %s",
-            exc,
-            extra={"provider": "ollama"},
-        )
-        if not settings.gemini_fallback_enabled:
-            raise LLMError(f"Ollama failed and Gemini fallback is not configured: {exc}") from exc
-
-    return _call_gemini(prompt, system)
+        return _call_ollama(prompt, system, max_tokens)
+    except Exception as exc:
+        raise LLMError(f"All LLM providers failed. Ollama error: {exc}") from exc
 
 
-def _call_ollama(prompt: str, system: str) -> LLMResult:
-    """Call Ollama chat API using the cached client.
+def _call_gemini(prompt: str, system: str, max_tokens: int | None) -> LLMResult:
+    """Call Gemini as the primary LLM using the cached model instance.
+
+    Args:
+        prompt: User message content.
+        system: System instruction (used as the cache key for model lookup).
+        max_tokens: Hard cap on generated tokens (None = model default).
+
+    Returns:
+        LLMResult from Gemini.
+
+    Raises:
+        LLMError: If the Gemini call fails.
+    """
+    import google.generativeai as genai  # type: ignore[import]
+
+    model = _get_gemini_model(system)
+    generation_config = genai.GenerationConfig(max_output_tokens=max_tokens) if max_tokens else None
+
+    start = time.perf_counter()
+    try:
+        response = model.generate_content(prompt, generation_config=generation_config)
+    except Exception as exc:
+        logger.error("Gemini call failed: %s", exc)
+        raise LLMError(f"Gemini failed: {exc}") from exc
+    latency_ms = (time.perf_counter() - start) * 1000
+
+    text = response.text or ""
+    logger.info(
+        "Gemini call complete",
+        extra={"latency_ms": round(latency_ms), "chars": len(text)},
+    )
+    return LLMResult(text=text, provider="gemini", latency_ms=latency_ms, cost_usd=0.0)
+
+
+def _call_ollama(prompt: str, system: str, max_tokens: int | None) -> LLMResult:
+    """Call Ollama as the fallback LLM using the cached client.
 
     Args:
         prompt: User message content.
         system: System message content (empty string = no system message).
+        max_tokens: Hard cap on generated tokens (None = model default).
 
     Returns:
         LLMResult from Ollama.
@@ -120,44 +158,21 @@ def _call_ollama(prompt: str, system: str) -> LLMResult:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
+    options: dict = {}
+    if max_tokens is not None:
+        options["num_predict"] = max_tokens
+
     start = time.perf_counter()
-    response = client.chat(model=settings.ollama_llm_model, messages=messages)
+    response = client.chat(
+        model=settings.ollama_llm_model,
+        messages=messages,
+        options=options if options else None,
+    )
     latency_ms = (time.perf_counter() - start) * 1000
 
     text = response.message.content or ""
-    logger.info(
-        "Ollama call complete",
-        extra={"latency_ms": round(latency_ms), "chars": len(text)},
-    )
-    return LLMResult(text=text, provider="ollama", latency_ms=latency_ms)
-
-
-def _call_gemini(prompt: str, system: str) -> LLMResult:
-    """Call Gemini 2.5 Flash as fallback using the cached model instance.
-
-    Args:
-        prompt: User message content.
-        system: System instruction (used as the cache key for model lookup).
-
-    Returns:
-        LLMResult from Gemini.
-
-    Raises:
-        LLMError: If the Gemini call also fails.
-    """
-    model = _get_gemini_model(system)
-
-    start = time.perf_counter()
-    try:
-        response = model.generate_content(prompt)
-    except Exception as exc:
-        logger.error("Gemini fallback also failed: %s", exc)
-        raise LLMError(f"Both Ollama and Gemini failed. Gemini error: {exc}") from exc
-    latency_ms = (time.perf_counter() - start) * 1000
-
-    text = response.text or ""
     logger.warning(
-        "Gemini fallback used",
+        "Ollama fallback used",
         extra={"latency_ms": round(latency_ms), "chars": len(text)},
     )
-    return LLMResult(text=text, provider="gemini-fallback", latency_ms=latency_ms, cost_usd=0.0)
+    return LLMResult(text=text, provider="ollama-fallback", latency_ms=latency_ms)

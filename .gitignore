@@ -23,6 +23,7 @@ build/
 # Data — raw is large, processed is generated
 data/raw/
 data/processed/
+data/knowledge/
 
 # Models — generated artifacts, not source
 models/*.joblib
@@ -48,3 +49,8 @@ frontend/dist/
 
 # Resources — course PDFs and archives
 resources/
+
+# planning files
+claude.md
+plan.md
+mentor_guidelines.md
