@@ -72,7 +72,8 @@ def _generate_rag(query: str, tickets: list[RetrievedTicket], threshold: float) 
         return LLMResult(text=RAG_NO_DATA_RESPONSE, provider="rag-no-match", latency_ms=0.0)
 
     context_parts = [
-        f"Ticket {i + 1}: {t.text}" for i, t in enumerate(tickets)
+        f"[Brand: {t.brand or 'Unknown'}] Ticket {i + 1}: {t.text}"
+        for i, t in enumerate(tickets)
     ]
     context = "\n".join(context_parts)
     prompt = RAG_TEMPLATE.format(context=context, query=safe_query)
@@ -95,8 +96,8 @@ def _generate_non_rag(query: str) -> LLMResult:
     """
     safe_query = sanitize_user_input(query)
     prompt = NON_RAG_TEMPLATE.format(query=safe_query)
-    # Hard token cap enforces the 1-2 sentence rule regardless of model compliance.
-    result = generate(prompt, system=NON_RAG_SYSTEM_PROMPT, max_tokens=200)
+    # Hard token cap backs up the 5-sentence prompt instruction.
+    result = generate(prompt, system=NON_RAG_SYSTEM_PROMPT, max_tokens=500)
     logger.info(
         "Non-RAG generation complete",
         extra={"provider": result.provider, "latency_ms": round(result.latency_ms)},

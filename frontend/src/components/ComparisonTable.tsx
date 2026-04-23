@@ -19,7 +19,7 @@ function LabelChip({ label }: { label: "urgent" | "normal" }) {
 function ConfidenceBar({ value, label }: { value: number | null; label: "urgent" | "normal" }) {
   if (value === null) {
     return (
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)" }}>
         n/a
       </span>
     );
@@ -35,6 +35,14 @@ function ConfidenceBar({ value, label }: { value: number | null; label: "urgent"
       <span className="confidence-val">{(value * 100).toFixed(0)}%</span>
     </div>
   );
+}
+
+function CostCell({ cost }: { cost: number }) {
+  if (cost === 0) {
+    return <span className="cost-free">Free</span>;
+  }
+  const formatted = cost < 0.001 ? `$${cost.toFixed(6)}` : `$${cost.toFixed(4)}`;
+  return <span className="cost-value">{formatted}</span>;
 }
 
 interface RowProps {
@@ -89,7 +97,7 @@ function PredictorRow({ name, sub, result, isLoading }: RowProps) {
         </span>
       </td>
       <td>
-        <span className="cost-free">$0.00</span>
+        <CostCell cost={result.cost_usd ?? 0} />
       </td>
     </tr>
   );
@@ -121,7 +129,7 @@ export function ComparisonTable({ mlResult, llmResult, isLoading }: Props) {
           />
           <PredictorRow
             name="LLM Zero-shot"
-            sub="Ollama / Gemini fallback"
+            sub="Gemini primary · Ollama fallback"
             result={llmResult}
             isLoading={isLoading}
           />

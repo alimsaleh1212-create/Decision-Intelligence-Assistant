@@ -15,6 +15,10 @@ from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Gemini 2.5 Flash pricing (USD per 1M tokens, non-thinking tier)
+_GEMINI_INPUT_COST_PER_M = 0.15
+_GEMINI_OUTPUT_COST_PER_M = 0.60
+
 
 class LLMError(Exception):
     """Raised when both Gemini and Ollama fail."""
@@ -128,11 +132,26 @@ def _call_gemini(prompt: str, system: str, max_tokens: int | None) -> LLMResult:
     latency_ms = (time.perf_counter() - start) * 1000
 
     text = response.text or ""
+
+    usage = response.usage_metadata
+    input_tokens = getattr(usage, "prompt_token_count", 0) or 0
+    output_tokens = getattr(usage, "candidates_token_count", 0) or 0
+    cost_usd = (
+        input_tokens * _GEMINI_INPUT_COST_PER_M
+        + output_tokens * _GEMINI_OUTPUT_COST_PER_M
+    ) / 1_000_000
+
     logger.info(
         "Gemini call complete",
-        extra={"latency_ms": round(latency_ms), "chars": len(text)},
+        extra={
+            "latency_ms": round(latency_ms),
+            "chars": len(text),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cost_usd": round(cost_usd, 6),
+        },
     )
-    return LLMResult(text=text, provider="gemini", latency_ms=latency_ms, cost_usd=0.0)
+    return LLMResult(text=text, provider="gemini", latency_ms=latency_ms, cost_usd=cost_usd)
 
 
 def _call_ollama(prompt: str, system: str, max_tokens: int | None) -> LLMResult:
