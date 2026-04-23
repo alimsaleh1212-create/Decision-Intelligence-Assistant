@@ -18,7 +18,11 @@ function LabelChip({ label }: { label: "urgent" | "normal" }) {
 
 function ConfidenceBar({ value, label }: { value: number | null; label: "urgent" | "normal" }) {
   if (value === null) {
-    return <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>n/a</span>;
+    return (
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>
+        n/a
+      </span>
+    );
   }
   return (
     <div className="confidence-bar">
@@ -41,23 +45,24 @@ interface RowProps {
 }
 
 function PredictorRow({ name, sub, result, isLoading }: RowProps) {
+  const skeletonCell = (
+    <div
+      className="skeleton-line"
+      style={{ width: "70%", height: 10, display: "inline-block" }}
+    />
+  );
+
   if (isLoading || !result) {
-    const cell = (
-      <div
-        className="skeleton-line"
-        style={{ width: "70%", height: 10, display: "inline-block" }}
-      />
-    );
     return (
       <tr>
         <td>
           <div className="predictor-name">{name}</div>
           <div className="predictor-sub">{sub}</div>
         </td>
-        <td>{isLoading ? cell : "—"}</td>
-        <td>{isLoading ? cell : "—"}</td>
-        <td>{isLoading ? cell : "—"}</td>
-        <td>{isLoading ? cell : "—"}</td>
+        <td>{isLoading ? skeletonCell : "—"}</td>
+        <td>{isLoading ? skeletonCell : "—"}</td>
+        <td>{isLoading ? skeletonCell : "—"}</td>
+        <td>{isLoading ? skeletonCell : "—"}</td>
       </tr>
     );
   }
@@ -93,8 +98,8 @@ function PredictorRow({ name, sub, result, isLoading }: RowProps) {
 export function ComparisonTable({ mlResult, llmResult, isLoading }: Props) {
   return (
     <div className="comparison-panel">
-      <div className="comparison-title">
-        Priority Predictor Comparison
+      <div className="comparison-header">
+        <span className="comparison-title">Priority Predictor Comparison</span>
         <span className="comparison-subtitle">ML classifier vs LLM zero-shot</span>
       </div>
       <table className="comparison-table">

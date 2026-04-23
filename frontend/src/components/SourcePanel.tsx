@@ -24,20 +24,26 @@ export function SourcePanel({ tickets }: Props) {
 
   return (
     <div className="source-section">
-      <div className="source-section-label">
-        Retrieved sources
-        <span className="source-count-badge">{tickets.length}</span>
+      <div className="source-header">
+        <div className="source-section-label">
+          Retrieved sources
+          <span className="source-count-badge">{tickets.length}</span>
+        </div>
       </div>
+
       {tickets.map((ticket, i) => (
         <div
           className="ticket-card"
           key={i}
-          style={{ animationDelay: `${i * 60}ms` }}
+          style={{ animationDelay: `${i * 55}ms` }}
         >
           <div className="ticket-meta">
             <span className="ticket-idx">#{i + 1}</span>
+            {ticket.brand && (
+              <span className="ticket-brand-chip">{ticket.brand}</span>
+            )}
             <span className={`ticket-score ${scoreClass(ticket.score)}`}>
-              {(ticket.score * 100).toFixed(1)}% match
+              {(ticket.score * 100).toFixed(1)}%
             </span>
           </div>
           <div className="ticket-text">{ticket.text}</div>

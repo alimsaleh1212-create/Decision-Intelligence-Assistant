@@ -7,10 +7,10 @@ interface Props {
 function SkeletonLines() {
   return (
     <div className="answer-skeleton">
-      <div className="skeleton-line" style={{ width: "92%" }} />
-      <div className="skeleton-line" style={{ width: "78%" }} />
-      <div className="skeleton-line" style={{ width: "85%" }} />
-      <div className="skeleton-line" style={{ width: "60%" }} />
+      <div className="skeleton-line" style={{ width: "90%" }} />
+      <div className="skeleton-line" style={{ width: "76%" }} />
+      <div className="skeleton-line" style={{ width: "84%" }} />
+      <div className="skeleton-line" style={{ width: "58%" }} />
     </div>
   );
 }
@@ -34,7 +34,10 @@ function AnswerCard({ badge, badgeClass, answer, isLoading, delay }: CardProps) 
       ) : answer ? (
         <div className="answer-body">{answer}</div>
       ) : (
-        <div className="answer-body" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+        <div
+          className="answer-body"
+          style={{ color: "var(--text-muted)", fontStyle: "italic", fontWeight: 300 }}
+        >
           Submit a query to see the answer.
         </div>
       )}
@@ -45,21 +48,10 @@ function AnswerCard({ badge, badgeClass, answer, isLoading, delay }: CardProps) 
 export function AnswerPanel({ ragAnswer, nonRagAnswer, isLoading }: Props) {
   return (
     <div>
-      <div
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "var(--text-secondary)",
-          marginBottom: 12,
-        }}
-      >
-        Generated answers
-      </div>
+      <div className="section-eyebrow">Generated answers</div>
       <div className="answers-grid">
         <AnswerCard
-          badge="RAG"
+          badge="RAG · Context-augmented"
           badgeClass="rag"
           answer={ragAnswer}
           isLoading={isLoading}

@@ -21,6 +21,7 @@ function StatusDot({ label, reachable }: { label: string; reachable: boolean | n
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [brands, setBrands] = useState<string[]>([]);
   const [state, setState] = useState<AppState>({
     queryResult: null,
     mlResult: null,
@@ -31,17 +32,17 @@ export default function App() {
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth(null));
+    api.brands().then((r) => setBrands(r.brands)).catch(() => setBrands([]));
   }, []);
 
-  const handleQuery = useCallback(async (query: string) => {
+  const handleQuery = useCallback(async (query: string, brand?: string) => {
     if (!query) return;
 
     setState((s) => ({ ...s, isLoading: true, error: null }));
 
     try {
-      // Fire query + both priority predictions concurrently
       const [queryRes, mlRes, llmRes] = await Promise.all([
-        api.query(query),
+        api.query(query, brand),
         api.priorityML(query),
         api.priorityLLM(query),
       ]);
@@ -66,10 +67,11 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className="app-header">
         <div className="app-header-brand">
           <span className="app-header-logo">DIA</span>
+          <div className="app-header-divider" />
           <span className="app-header-sub">Decision Intelligence Assistant</span>
         </div>
         <div className="status-dots">
@@ -81,11 +83,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Body ───────────────────────────────────────────────────────── */}
+      {/* ── Body ────────────────────────────────────────────────────────── */}
       <div className="app-body">
         {/* Left: query + sources */}
         <div className="left-panel">
-          <QueryInput onSubmit={handleQuery} isLoading={isLoading} />
+          <QueryInput onSubmit={handleQuery} isLoading={isLoading} brands={brands} />
           <SourcePanel tickets={queryResult?.retrieved_tickets ?? []} />
         </div>
 
@@ -99,12 +101,14 @@ export default function App() {
 
           {!queryResult && !isLoading && !error ? (
             <div className="empty-state">
-              <div className="empty-state-glyph">⌬</div>
+              <div className="empty-state-orb">
+                <div className="empty-state-glyph">⌬</div>
+              </div>
               <div className="empty-state-title">Ready to analyse</div>
               <div className="empty-state-hint">
-                Type a support ticket on the left. The system will retrieve
-                similar cases, generate RAG and non-RAG answers, and compare
-                ML vs LLM priority prediction.
+                Type a support ticket on the left. The system retrieves similar
+                cases, generates RAG and non-RAG answers, and compares ML vs
+                LLM priority prediction.
               </div>
             </div>
           ) : (

@@ -3,6 +3,7 @@
 export interface RetrievedTicket {
   text: string;
   score: number;
+  brand: string;
 }
 
 export interface QueryResponse {
@@ -25,4 +26,8 @@ export interface HealthResponse {
   ollama: { reachable: boolean; detail: string };
   qdrant: { reachable: boolean; detail: string };
   gemini_fallback_configured: boolean;
+}
+
+export interface BrandsResponse {
+  brands: string[];
 }
