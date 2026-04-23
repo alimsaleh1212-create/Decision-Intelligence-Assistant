@@ -7,6 +7,7 @@ Ollama or Gemini directly. The caller never knows which provider responded.
 import logging
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 
 import ollama
 
@@ -29,15 +30,51 @@ class LLMResult:
     cost_usd: float = 0.0
 
 
+@lru_cache(maxsize=1)
+def _get_ollama_client() -> ollama.Client:
+    """Return a single cached Ollama client for the process lifetime.
+
+    Settings are also cached via lru_cache, so host/timeout are stable.
+    """
+    settings = get_settings()
+    return ollama.Client(
+        host=settings.ollama_base_url,
+        timeout=settings.ollama_timeout_seconds,
+    )
+
+
+@lru_cache(maxsize=8)
+def _get_gemini_model(system: str) -> "genai.GenerativeModel":  # type: ignore[name-defined]
+    """Return a cached Gemini model instance keyed by system instruction.
+
+    In practice there are 3 distinct system prompts (RAG, non-RAG,
+    priority predictor), so this cache never holds more than 3 entries.
+    genai.configure() is idempotent; calling it once per unique key is safe.
+
+    Args:
+        system: System instruction string baked into the model at construction.
+
+    Returns:
+        Configured GenerativeModel instance, cached for the process lifetime.
+    """
+    import google.generativeai as genai  # lazy import — only when fallback fires
+
+    settings = get_settings()
+    genai.configure(api_key=settings.google_api_key)
+    return genai.GenerativeModel(
+        model_name=settings.gemini_llm_model,
+        system_instruction=system or None,
+    )
+
+
 def generate(prompt: str, system: str = "") -> LLMResult:
     """Generate text from the configured LLM with automatic fallback.
 
-    Tries Ollama first. On ConnectionError or timeout falls back to
-    Gemini 2.5 Flash if GOOGLE_API_KEY is configured. If neither
-    succeeds, raises LLMError.
+    Tries Ollama first. On any failure falls back to Gemini 2.5 Flash
+    if GOOGLE_API_KEY is configured. If neither succeeds, raises LLMError.
 
     Args:
-        prompt: The user/task prompt.
+        prompt: The user/task prompt (caller is responsible for sanitizing).
         system: Optional system instruction prepended to the conversation.
 
     Returns:
@@ -62,7 +99,7 @@ def generate(prompt: str, system: str = "") -> LLMResult:
 
 
 def _call_ollama(prompt: str, system: str) -> LLMResult:
-    """Call Ollama chat API.
+    """Call Ollama chat API using the cached client.
 
     Args:
         prompt: User message content.
@@ -76,16 +113,14 @@ def _call_ollama(prompt: str, system: str) -> LLMResult:
         ConnectionError: When Ollama is unreachable.
     """
     settings = get_settings()
+    client = _get_ollama_client()
+
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
     start = time.perf_counter()
-    client = ollama.Client(
-        host=settings.ollama_base_url,
-        timeout=settings.ollama_timeout_seconds,
-    )
     response = client.chat(model=settings.ollama_llm_model, messages=messages)
     latency_ms = (time.perf_counter() - start) * 1000
 
@@ -98,11 +133,11 @@ def _call_ollama(prompt: str, system: str) -> LLMResult:
 
 
 def _call_gemini(prompt: str, system: str) -> LLMResult:
-    """Call Gemini 2.5 Flash as fallback.
+    """Call Gemini 2.5 Flash as fallback using the cached model instance.
 
     Args:
         prompt: User message content.
-        system: System instruction (Gemini supports this natively).
+        system: System instruction (used as the cache key for model lookup).
 
     Returns:
         LLMResult from Gemini.
@@ -110,14 +145,7 @@ def _call_gemini(prompt: str, system: str) -> LLMResult:
     Raises:
         LLMError: If the Gemini call also fails.
     """
-    import google.generativeai as genai  # imported lazily — only when fallback fires
-
-    settings = get_settings()
-    genai.configure(api_key=settings.google_api_key)
-    model = genai.GenerativeModel(
-        model_name=settings.gemini_llm_model,
-        system_instruction=system or None,
-    )
+    model = _get_gemini_model(system)
 
     start = time.perf_counter()
     try:
@@ -132,5 +160,4 @@ def _call_gemini(prompt: str, system: str) -> LLMResult:
         "Gemini fallback used",
         extra={"latency_ms": round(latency_ms), "chars": len(text)},
     )
-    # Gemini Flash 2.5 free tier — $0.00 for ≤1500 req/day; we report $0 for simplicity
     return LLMResult(text=text, provider="gemini-fallback", latency_ms=latency_ms, cost_usd=0.0)

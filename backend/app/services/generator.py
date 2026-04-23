@@ -9,18 +9,34 @@ import logging
 
 from app.schemas.query import RetrievedTicket
 from app.services.llm_client import LLMResult, generate
+from app.utils.prompt_guard import sanitize_user_input
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
-    "You are a helpful customer support assistant. "
-    "Answer clearly and concisely based on the information provided. "
-    "If you do not know the answer, say so. "
-    "Never fabricate information."
+# RAG: model must stay strictly within the retrieved context.
+_RAG_SYSTEM_PROMPT = (
+    "You are a customer support assistant analysing historical support tickets. "
+    "Answer the user's question using ONLY the information in the retrieved support tickets provided. "
+    "If the retrieved tickets do not contain sufficient information to answer, respond with: "
+    "'The retrieved support tickets do not contain enough information to answer this question.' "
+    "Do not use any knowledge outside of the provided context. "
+    "Do not fabricate details, invent resolutions, or extrapolate beyond what the tickets show."
 )
 
+# Non-RAG: model answers from general knowledge and must be transparent about it.
+_NON_RAG_SYSTEM_PROMPT = (
+    "You are a general-purpose customer support assistant. "
+    "You are answering from your general training knowledge — you have no access to this customer's "
+    "account, order history, or any retrieved tickets. "
+    "Answer clearly based on general customer support best practices. "
+    "If you cannot answer without account-specific information, say so explicitly. "
+    "Do not fabricate specific details or account-level information."
+)
+
+# Retrieved context injected before the user query; model instructed not to escape it.
 _RAG_TEMPLATE = """\
-Use the following retrieved support tickets as context to answer the user's question.
+Answer the user's question using ONLY the retrieved support tickets below. \
+Do not use any knowledge outside of this context.
 
 <retrieved_context>
 {context}
@@ -31,7 +47,11 @@ Use the following retrieved support tickets as context to answer the user's ques
 </user_input>
 """
 
+# No context: explicit acknowledgment embedded in the template framing.
 _NON_RAG_TEMPLATE = """\
+Answer based on your general knowledge of customer support. \
+You have no retrieved tickets or account-specific information.
+
 <user_input>
 {query}
 </user_input>
@@ -45,7 +65,7 @@ async def generate_both(
     """Generate RAG and non-RAG answers concurrently.
 
     Args:
-        query: Sanitized user query.
+        query: Raw user query from the API (sanitized inside this function).
         tickets: Retrieved context tickets (may be empty).
 
     Returns:
@@ -66,18 +86,19 @@ def _generate_rag(query: str, tickets: list[RetrievedTicket]) -> LLMResult:
     """Build RAG prompt and call the LLM.
 
     Args:
-        query: User query (already sanitized at API boundary).
+        query: User query — sanitized here before prompt interpolation.
         tickets: Retrieved context tickets.
 
     Returns:
         LLMResult from llm_client.
     """
+    safe_query = sanitize_user_input(query)
     context_parts = [
         f"Ticket {i + 1}: {t.text}" for i, t in enumerate(tickets)
     ]
     context = "\n".join(context_parts) if context_parts else "No relevant tickets found."
-    prompt = _RAG_TEMPLATE.format(context=context, query=query)
-    result = generate(prompt, system=_SYSTEM_PROMPT)
+    prompt = _RAG_TEMPLATE.format(context=context, query=safe_query)
+    result = generate(prompt, system=_RAG_SYSTEM_PROMPT)
     logger.info(
         "RAG generation complete",
         extra={"provider": result.provider, "latency_ms": round(result.latency_ms)},
@@ -89,13 +110,14 @@ def _generate_non_rag(query: str) -> LLMResult:
     """Build non-RAG prompt and call the LLM.
 
     Args:
-        query: User query (already sanitized at API boundary).
+        query: User query — sanitized here before prompt interpolation.
 
     Returns:
         LLMResult from llm_client.
     """
-    prompt = _NON_RAG_TEMPLATE.format(query=query)
-    result = generate(prompt, system=_SYSTEM_PROMPT)
+    safe_query = sanitize_user_input(query)
+    prompt = _NON_RAG_TEMPLATE.format(query=safe_query)
+    result = generate(prompt, system=_NON_RAG_SYSTEM_PROMPT)
     logger.info(
         "Non-RAG generation complete",
         extra={"provider": result.provider, "latency_ms": round(result.latency_ms)},

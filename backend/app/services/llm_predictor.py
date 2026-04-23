@@ -9,6 +9,7 @@ import re
 
 from app.schemas.priority import PriorityResponse
 from app.services.llm_client import LLMError, generate
+from app.utils.prompt_guard import sanitize_user_input
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,8 @@ async def predict(text: str) -> PriorityResponse:
     Raises:
         LLMError: If both Ollama and Gemini fail.
     """
-    prompt = _PROMPT_TEMPLATE.format(text=text)
+    safe_text = sanitize_user_input(text)
+    prompt = _PROMPT_TEMPLATE.format(text=safe_text)
     result = generate(prompt, system=_SYSTEM_PROMPT)
 
     raw = result.text.strip().lower()
