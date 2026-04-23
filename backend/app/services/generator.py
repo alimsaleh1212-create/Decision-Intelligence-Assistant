@@ -7,6 +7,7 @@ latency equals the slower of the two, not the sum.
 import asyncio
 import logging
 
+from app.core.settings import RAG_NO_DATA_RESPONSE, get_settings
 from app.schemas.query import RetrievedTicket
 from app.services.llm_client import LLMResult, generate
 from app.utils.prompt_guard import sanitize_user_input
@@ -93,10 +94,22 @@ def _generate_rag(query: str, tickets: list[RetrievedTicket]) -> LLMResult:
         LLMResult from llm_client.
     """
     safe_query = sanitize_user_input(query)
+
+    # Quality gate: skip LLM if the best retrieved chunk is below the threshold.
+    # This avoids hallucination on irrelevant context and saves an LLM call.
+    best_score = max((t.score for t in tickets), default=0.0)
+    threshold = get_settings().rag_score_threshold
+    if best_score < threshold:
+        logger.info(
+            "RAG skipped — best score below threshold",
+            extra={"best_score": best_score, "threshold": threshold},
+        )
+        return LLMResult(text=RAG_NO_DATA_RESPONSE, provider="rag-no-match", latency_ms=0.0)
+
     context_parts = [
         f"Ticket {i + 1}: {t.text}" for i, t in enumerate(tickets)
     ]
-    context = "\n".join(context_parts) if context_parts else "No relevant tickets found."
+    context = "\n".join(context_parts)
     prompt = _RAG_TEMPLATE.format(context=context, query=safe_query)
     result = generate(prompt, system=_RAG_SYSTEM_PROMPT)
     logger.info(

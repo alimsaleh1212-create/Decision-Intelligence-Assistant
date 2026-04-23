@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     log_dir: str = "/app/logs"
     model_dir: str = "/app/models"
 
+    # RAG retrieval quality gate — cosine similarity range [0, 1].
+    # Chunks whose best match score falls below this value are considered
+    # too dissimilar to be useful; the LLM call is skipped entirely.
+    # Override with RAG_SCORE_THRESHOLD env var.
+    rag_score_threshold: float = 0.5
+
     @field_validator("ollama_base_url")
     @classmethod
     def validate_ollama_url(cls, v: str) -> str:
@@ -64,6 +70,14 @@ class Settings(BaseSettings):
     def gemini_fallback_enabled(self) -> bool:
         """True when GOOGLE_API_KEY is set and non-empty."""
         return bool(self.google_api_key)
+
+
+# Returned verbatim when no retrieved chunk meets the score threshold.
+# Declared here (not in generator.py) so all modules share one source of truth.
+RAG_NO_DATA_RESPONSE = (
+    "We're sorry, but we couldn't find any relevant information in our knowledge base "
+    "to answer your question. Please contact our support team directly for further assistance."
+)
 
 
 @lru_cache
