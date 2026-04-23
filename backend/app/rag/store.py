@@ -1,7 +1,7 @@
 """Qdrant collection management and chunk upsert operations.
 
-Payload stored per point: text, thread_id, message_count.
-No priority_label is stored — classification is handled at query time by the ML model.
+Payload stored per point: text, thread_id, brand, message_count.
+No priority_label — classification is handled at query time by the ML model.
 """
 
 import logging
@@ -42,8 +42,8 @@ def upsert_chunks(
 ) -> int:
     """Upsert embedded chunks into the Qdrant collection in batches.
 
-    Point ID is the thread_id (root tweet ID), which is a stable int64.
-    Payload contains text, thread_id, and message_count only.
+    Point ID is the thread_id (root tweet ID), a stable int64.
+    Payload: text, thread_id, brand, message_count.
 
     Args:
         client: Qdrant client instance.
@@ -75,6 +75,7 @@ def upsert_chunks(
                 payload={
                     "text": chunk.text,
                     "thread_id": chunk.thread_id,
+                    "brand": chunk.brand,
                     "message_count": chunk.message_count,
                 },
             )
