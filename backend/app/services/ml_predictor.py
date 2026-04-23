@@ -14,12 +14,21 @@ import joblib
 import numpy as np
 from sklearn.pipeline import Pipeline
 
+from app.core.settings import get_settings
 from app.schemas.priority import PriorityResponse
 from app.utils.feature_extractor import extract_features
 
 logger = logging.getLogger(__name__)
 
-_MODEL_PATH = Path("/app/models/priority_classifier_v1.joblib")
+
+def _model_path() -> Path:
+    """Resolve model path — settings first, then relative fallback for local dev."""
+    configured = Path(get_settings().model_dir) / "priority_classifier_v1.joblib"
+    if configured.exists():
+        return configured
+    # When running outside Docker, models/ sits two levels above backend/
+    local = Path(__file__).parent.parent.parent.parent / "models" / "priority_classifier_v1.joblib"
+    return local
 
 
 class MLPredictorError(Exception):
@@ -36,10 +45,11 @@ def _load_model() -> Pipeline:
     Raises:
         MLPredictorError: If the model file does not exist or cannot be loaded.
     """
-    if not _MODEL_PATH.exists():
-        raise MLPredictorError(f"Model file not found: {_MODEL_PATH}")
-    model: Pipeline = joblib.load(_MODEL_PATH)
-    logger.info("ML model loaded", extra={"path": str(_MODEL_PATH)})
+    path = _model_path()
+    if not path.exists():
+        raise MLPredictorError(f"Model file not found: {path}")
+    model: Pipeline = joblib.load(path)
+    logger.info("ML model loaded", extra={"path": str(path)})
     return model
 
 

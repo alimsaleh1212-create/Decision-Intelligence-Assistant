@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # Backend
     log_level: str = "INFO"
     log_dir: str = "/app/logs"
+    model_dir: str = "/app/models"
 
     @field_validator("ollama_base_url")
     @classmethod
