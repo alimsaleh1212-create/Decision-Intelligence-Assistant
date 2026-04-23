@@ -1,69 +1,30 @@
-"""Convert raw thread message lists into ThreadChunk Pydantic objects.
+"""Chunker — passthrough for pre-formatted ThreadChunk objects.
 
-Each chunk's text is a formatted dialogue string that reads naturally as a
-conversation, giving the embedding model the best signal for retrieval.
-The brand field is derived from the author_id of the first outbound message.
+Thread formatting (dialogue text, brand extraction) is done once in
+notebooks/knowledge_preprocessing.ipynb. At ingest time chunks arrive
+already formatted from loader.build_index(); this module exists as a
+thin validation/logging layer so the router pipeline stays uniform.
 """
 
 import logging
 
-from app.schemas.ingest import ThreadChunk, ThreadMessage
+from app.schemas.ingest import ThreadChunk
 
 logger = logging.getLogger(__name__)
 
-_CUSTOMER_LABEL = "[Customer]"
-_BRAND_LABEL = "[Brand]"
-_UNKNOWN_BRAND = "unknown"
 
-
-def build_chunks(threads: list[list[ThreadMessage]]) -> list[ThreadChunk]:
-    """Convert thread message lists into ThreadChunk objects ready for embedding.
+def build_chunks(chunks: list[ThreadChunk]) -> list[ThreadChunk]:
+    """Validate and return chunks, dropping any with empty text.
 
     Args:
-        threads: List of threads as returned by loader.reconstruct_batch().
+        chunks: ThreadChunk objects as returned by loader.get_batch().
 
     Returns:
-        List of ThreadChunk objects, one per non-empty thread.
+        Filtered list with empty-text chunks removed.
     """
-    chunks: list[ThreadChunk] = []
-    for messages in threads:
-        chunk = _thread_to_chunk(messages)
-        if chunk is not None:
-            chunks.append(chunk)
-
-    logger.info("Built %d chunks from %d threads", len(chunks), len(threads))
-    return chunks
-
-
-def _thread_to_chunk(messages: list[ThreadMessage]) -> ThreadChunk | None:
-    """Format a single thread into a ThreadChunk.
-
-    Brand is the author_id of the first outbound (brand) message in the thread.
-    Falls back to "unknown" for customer-only threads with no brand reply yet.
-
-    Args:
-        messages: Ordered list of ThreadMessage for one thread.
-
-    Returns:
-        ThreadChunk, or None if messages is empty.
-    """
-    if not messages:
-        return None
-
-    brand = next(
-        (msg.author_id for msg in messages if not msg.inbound),
-        _UNKNOWN_BRAND,
-    )
-
-    lines = [
-        f"{_CUSTOMER_LABEL if msg.inbound else _BRAND_LABEL}: {msg.text}"
-        for msg in messages
-    ]
-
-    return ThreadChunk(
-        thread_id=messages[0].tweet_id,
-        brand=brand,
-        text="\n".join(lines),
-        message_count=len(messages),
-        messages=messages,
-    )
+    valid = [c for c in chunks if c.text.strip()]
+    dropped = len(chunks) - len(valid)
+    if dropped:
+        logger.warning("Dropped %d chunks with empty text", dropped)
+    logger.info("Chunks ready for embedding: %d", len(valid))
+    return valid

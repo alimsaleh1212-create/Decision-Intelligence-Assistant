@@ -49,15 +49,16 @@ class IngestRequest(BaseModel):
     """Request body for POST /api/ingest.
 
     Attributes:
-        batch_size: Number of thread roots to embed and store in this call.
-        raw_csv_path: Absolute path to twcs.csv inside the container (or locally).
-        reset: If True, discard the cached index and cursor, restart from the beginning.
+        batch_size: Number of thread chunks to embed and store in this call.
+        knowledge_csv_path: Absolute path to thread_chunks.csv produced by the
+            knowledge_preprocessing notebook.
+        reset: If True, discard the cached chunks and cursor, restart from the beginning.
     """
 
-    batch_size: int = Field(default=500, ge=1, description="Threads to process per call.")
-    raw_csv_path: str = Field(
-        default="/app/data/raw/twcs.csv",
-        description="Absolute path to twcs.csv.",
+    batch_size: int = Field(default=500, ge=1, description="Chunks to process per call.")
+    knowledge_csv_path: str = Field(
+        default="/app/data/knowledge/thread_chunks.csv",
+        description="Absolute path to thread_chunks.csv.",
     )
     reset: bool = Field(default=False, description="Restart ingest from the beginning.")
 
