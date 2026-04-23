@@ -5,7 +5,16 @@
  * or the injected VITE_API_BASE_URL in production builds.
  */
 
-import type { BrandsResponse, HealthResponse, PriorityResponse, QueryResponse } from "../types";
+import type {
+  BrandsResponse,
+  HealthResponse,
+  LogsResponse,
+  MetricsResponse,
+  ObservationRecord,
+  PriorityResponse,
+  QueryResponse,
+  RecordRequest,
+} from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -51,4 +60,13 @@ export const api = {
 
   priorityLLM: (text: string): Promise<PriorityResponse> =>
     post<PriorityResponse>("/api/priority/llm", { text }),
+
+  recordObservation: (req: RecordRequest): Promise<ObservationRecord> =>
+    post<ObservationRecord>("/api/observability/record", req),
+
+  getLogs: (limit = 100): Promise<LogsResponse> =>
+    get<LogsResponse>(`/api/observability/logs?limit=${limit}`),
+
+  getMetrics: (): Promise<MetricsResponse> =>
+    get<MetricsResponse>("/api/observability/metrics"),
 };

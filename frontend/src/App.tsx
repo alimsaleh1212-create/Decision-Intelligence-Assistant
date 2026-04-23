@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import { AnswerPanel } from "./components/AnswerPanel";
 import { ComparisonTable } from "./components/ComparisonTable";
+import { ObservabilityPage } from "./components/ObservabilityPage";
 import { QueryInput } from "./components/QueryInput";
 import { SourcePanel } from "./components/SourcePanel";
 import type { HealthResponse, PriorityResponse, QueryResponse } from "./types";
+
+type Tab = "intelligence" | "observability";
 
 interface AppState {
   queryResult: QueryResponse | null;
@@ -20,6 +23,7 @@ function StatusDot({ label, reachable }: { label: string; reachable: boolean | n
 }
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState<Tab>("intelligence");
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [brands, setBrands] = useState<string[]>([]);
   const [state, setState] = useState<AppState>({
@@ -54,6 +58,32 @@ export default function App() {
         isLoading: false,
         error: null,
       });
+
+      // Fire-and-forget: record observation for the observability page.
+      api.recordObservation({
+        query,
+        brand: brand ?? null,
+        rag_score_threshold: threshold ?? null,
+        rag_answer: queryRes.rag_answer,
+        non_rag_answer: queryRes.non_rag_answer,
+        retrieved_tickets_count: queryRes.retrieved_tickets.length,
+        ml: {
+          label: mlRes.label,
+          confidence: mlRes.confidence,
+          latency_ms: mlRes.latency_ms,
+          provider: mlRes.provider,
+          cost_usd: mlRes.cost_usd,
+        },
+        llm: {
+          label: llmRes.label,
+          confidence: llmRes.confidence,
+          latency_ms: llmRes.latency_ms,
+          provider: llmRes.provider,
+          cost_usd: llmRes.cost_usd,
+        },
+      }).catch(() => {
+        // Observability is non-critical — silently ignore failures.
+      });
     } catch (err) {
       setState((s) => ({
         ...s,
@@ -83,50 +113,71 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="app-body">
-        {/* Left: query + sources */}
-        <div className="left-panel">
-          <QueryInput onSubmit={handleQuery} isLoading={isLoading} brands={brands} />
-          <SourcePanel tickets={queryResult?.retrieved_tickets ?? []} />
-        </div>
+      {/* ── Tab nav ─────────────────────────────────────────────────────── */}
+      <nav className="tab-nav">
+        <button
+          className={`tab-btn ${activeTab === "intelligence" ? "active" : ""}`}
+          onClick={() => setActiveTab("intelligence")}
+        >
+          Intelligence
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "observability" ? "active" : ""}`}
+          onClick={() => setActiveTab("observability")}
+        >
+          Observability
+        </button>
+      </nav>
 
-        {/* Right: answers + comparison */}
-        <div className="right-panel">
-          {error && (
-            <div className="error-banner">
-              ⚠ {error}
-            </div>
-          )}
+      {/* ── Intelligence tab ────────────────────────────────────────────── */}
+      {activeTab === "intelligence" && (
+        <div className="app-body">
+          {/* Left: query + sources */}
+          <div className="left-panel">
+            <QueryInput onSubmit={handleQuery} isLoading={isLoading} brands={brands} />
+            <SourcePanel tickets={queryResult?.retrieved_tickets ?? []} />
+          </div>
 
-          {!queryResult && !isLoading && !error ? (
-            <div className="empty-state">
-              <div className="empty-state-orb">
-                <div className="empty-state-glyph">⌬</div>
+          {/* Right: answers + comparison */}
+          <div className="right-panel">
+            {error && (
+              <div className="error-banner">
+                ⚠ {error}
               </div>
-              <div className="empty-state-title">Ready to analyse</div>
-              <div className="empty-state-hint">
-                Type a support ticket on the left. The system retrieves similar
-                cases, generates RAG and non-RAG answers, and compares ML vs
-                LLM priority prediction.
+            )}
+
+            {!queryResult && !isLoading && !error ? (
+              <div className="empty-state">
+                <div className="empty-state-orb">
+                  <div className="empty-state-glyph">⌬</div>
+                </div>
+                <div className="empty-state-title">Ready to analyse</div>
+                <div className="empty-state-hint">
+                  Type a support ticket on the left. The system retrieves similar
+                  cases, generates RAG and non-RAG answers, and compares ML vs
+                  LLM priority prediction.
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              <AnswerPanel
-                ragAnswer={queryResult?.rag_answer ?? null}
-                nonRagAnswer={queryResult?.non_rag_answer ?? null}
-                isLoading={isLoading}
-              />
-              <ComparisonTable
-                mlResult={mlResult}
-                llmResult={llmResult}
-                isLoading={isLoading}
-              />
-            </>
-          )}
+            ) : (
+              <>
+                <AnswerPanel
+                  ragAnswer={queryResult?.rag_answer ?? null}
+                  nonRagAnswer={queryResult?.non_rag_answer ?? null}
+                  isLoading={isLoading}
+                />
+                <ComparisonTable
+                  mlResult={mlResult}
+                  llmResult={llmResult}
+                  isLoading={isLoading}
+                />
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Observability tab ────────────────────────────────────────────── */}
+      {activeTab === "observability" && <ObservabilityPage />}
     </div>
   );
 }
