@@ -69,6 +69,7 @@ services:
       - "8000:8000"
     volumes:
       - ./models:/app/models:ro       # trained model artefacts (read-only)
+      - ./data:/app/data:ro           # knowledge CSVs for ingest (read-only)
       - logs_data:/app/logs           # persistent query logs
     env_file:
       - .env
