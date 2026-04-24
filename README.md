@@ -100,10 +100,10 @@ Before querying, embed the support ticket dataset into Qdrant:
 
 ```bash
 # Check current ingest state
-python backend/app/utils/ingest_all.py --status
+python backend/app/rag/ingest_all.py --status
 
 # Run full ingest with live progress
-python backend/app/utils/ingest_all.py
+python backend/app/rag/ingest_all.py
 
 # Install deps first (one-time)
 cd backend && uv sync && cd ..

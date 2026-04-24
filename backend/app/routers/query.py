@@ -11,9 +11,10 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.settings import get_settings
 from app.schemas.query import BrandsResponse, QueryRequest, QueryResponse
-from app.services import generator, retriever
+from app.rag import retriever
+from app.rag.retriever import RetrieverError
+from app.services import generator
 from app.services.query_logger import log_query
-from app.services.retriever import RetrieverError
 
 logger = logging.getLogger(__name__)
 
